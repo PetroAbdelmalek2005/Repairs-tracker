@@ -28,17 +28,19 @@ const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 const today = () => new Date().toLocaleDateString("en-CA");
 
 const STATUSES = [
-  { key: "new",      label: "New",          color: "#60a5fa", bg: "#172554" },
-  { key: "diag",     label: "Diagnosing",   color: "#fbbf24", bg: "#1c1400" },
-  { key: "approved", label: "Approved",     color: "#c084fc", bg: "#1e1030" },
-  { key: "wip",      label: "In Progress",  color: "#34d399", bg: "#022c22" },
-  { key: "ready",    label: "Ready Pickup", color: "#fb923c", bg: "#1c0e00" },
-  { key: "paid",     label: "Paid ✓",       color: "#6b7280", bg: "#111827" },
+  { key: "new",       label: "New",          color: "#60a5fa", bg: "#172554" },
+  { key: "diag",      label: "Diagnosing",   color: "#fbbf24", bg: "#1c1400" },
+  { key: "approved",  label: "Approved",     color: "#c084fc", bg: "#1e1030" },
+  { key: "wip",       label: "In Progress",  color: "#34d399", bg: "#022c22" },
+  { key: "ready",     label: "Ready Pickup", color: "#fb923c", bg: "#1c0e00" },
+  { key: "paid",      label: "Paid ✓",       color: "#6b7280", bg: "#111827" },
+  { key: "cancelled", label: "Cancelled",    color: "#f87171", bg: "#1f1315" },
 ];
+const FLOW_STATUSES = STATUSES.filter(s => s.key !== "cancelled");
 const getSt = (k) => STATUSES.find(s => s.key === k) || STATUSES[0];
 const nextSt = (k) => {
-  const i = STATUSES.findIndex(s => s.key === k);
-  return STATUSES[Math.min(i + 1, STATUSES.length - 1)].key;
+  const i = FLOW_STATUSES.findIndex(s => s.key === k);
+  return FLOW_STATUSES[Math.min(i + 1, FLOW_STATUSES.length - 1)].key;
 };
 
 // localStorage persistence
@@ -127,7 +129,9 @@ function Dashboard({ jobs, customers, onSelect, onNew }) {
   const [filter, setFilter] = useState("active");
   const activeKeys = ["new","diag","approved","wip","ready"];
   const visible = filter === "active" ? jobs.filter(j => activeKeys.includes(j.status))
-    : filter === "paid" ? jobs.filter(j => j.status === "paid") : jobs;
+    : filter === "paid" ? jobs.filter(j => j.status === "paid")
+    : filter === "cancelled" ? jobs.filter(j => j.status === "cancelled")
+    : jobs;
   const revenue = jobs.filter(j => j.status === "paid").reduce((s,j) => s + (j.total||0), 0);
   const open = jobs.filter(j => activeKeys.includes(j.status)).length;
 
@@ -143,7 +147,7 @@ function Dashboard({ jobs, customers, onSelect, onNew }) {
         ))}
       </div>
       <div style={{ display: "flex", gap: 8 }}>
-        {[["active","Active"],["paid","Paid"],["all","All"]].map(([k,l]) => (
+        {[["active","Active"],["paid","Paid"],["cancelled","Cancelled"],["all","All"]].map(([k,l]) => (
           <button key={k} onClick={() => setFilter(k)}
             style={{
               background: filter===k ? T.accent : T.surface,
@@ -336,8 +340,16 @@ function JobDetail({ job, customer, allServices, onUpdate, onBack }) {
     onUpdate({ ...job, status: ns, history });
   };
 
+  const cancelJob = () => {
+    if (!window.confirm("Cancel this job? This can't be undone.")) return;
+    const history = [...(job.history||[]), { date: today(), note: "→ Cancelled" }];
+    onUpdate({ ...job, status: "cancelled", history });
+  };
+
   const st = getSt(job.status);
   const isPaid = job.status === "paid";
+  const isCancelled = job.status === "cancelled";
+  const isTerminal = isPaid || isCancelled;
   const TABS = [
     { key: "overview", icon: "◎", label: "Overview" },
     { key: "work",     icon: "🔧", label: `Work${job.services.length ? ` (${job.services.length})` : ""}` },
@@ -371,16 +383,27 @@ function JobDetail({ job, customer, allServices, onUpdate, onBack }) {
           <Pill statusKey={job.status} />
         </div>
       </div>
-      {!isPaid && (
-        <button onClick={advance}
-          style={{
-            background: st.bg, border: `1.5px solid ${st.color}55`,
-            color: st.color, borderRadius: 12, padding: "14px 16px",
-            fontWeight: 700, fontSize: 15, cursor: "pointer",
-            marginBottom: 16, width: "100%", minHeight: 52,
-          }}>
-          Mark as {getSt(nextSt(job.status)).label} →
-        </button>
+      {!isTerminal && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          <button onClick={advance}
+            style={{
+              flex: 1, background: st.bg, border: `1.5px solid ${st.color}55`,
+              color: st.color, borderRadius: 12, padding: "14px 16px",
+              fontWeight: 700, fontSize: 15, cursor: "pointer",
+              minHeight: 52,
+            }}>
+            Mark as {getSt(nextSt(job.status)).label} →
+          </button>
+          <button onClick={cancelJob}
+            style={{
+              background: "#1f1315", border: "1.5px solid #f8717155",
+              color: "#f87171", borderRadius: 12, padding: "14px 16px",
+              fontWeight: 700, fontSize: 15, cursor: "pointer",
+              minHeight: 52,
+            }}>
+            Cancel
+          </button>
+        </div>
       )}
       <div style={{ display: "flex", borderBottom: `1.5px solid ${T.border}`, marginBottom: 16 }}>
         {TABS.map(t => (
