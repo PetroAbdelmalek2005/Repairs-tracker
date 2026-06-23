@@ -255,8 +255,13 @@ function Dashboard({ jobs, flips, customers, onSelect, onNew }) {
               }}>
               <div style={{ display: "flex", justifyContent: "space-between",
                 alignItems: "flex-start", marginBottom: 10 }}>
-                <div style={{ color: T.text, fontWeight: 700, fontSize: 17 }}>
-                  {cust?.name || "Unknown"}
+                <div>
+                  <div style={{ color: T.text, fontWeight: 700, fontSize: 17 }}>
+                    {job.name || cust?.name || "Unknown"}
+                  </div>
+                  {job.name && cust?.name && (
+                    <div style={{ color: T.muted, fontSize: 12, marginTop: 2 }}>{cust.name}</div>
+                  )}
                 </div>
                 <Pill statusKey={job.status} />
               </div>
@@ -288,6 +293,7 @@ function NewJob({ customers, onSave, onCancel }) {
   const [phone, setPhone] = useState("");
   const [equipType, setEquipType] = useState("");
   const [equipMake, setEquipMake] = useState("");
+  const [jobName, setJobName] = useState("");
   const [notes, setNotes] = useState("");
   const valid = mode === "existing" ? !!existingId : !!name;
 
@@ -297,8 +303,10 @@ function NewJob({ customers, onSave, onCancel }) {
       cid = genId();
       newCust = { id: cid, name, phone, createdAt: today() };
     }
+    const custName = mode === "new" ? name : (customers.find(c => c.id === existingId)?.name || "");
+    const autoName = jobName || [custName, equipType].filter(Boolean).join(" – ") || "Untitled Job";
     onSave({
-      id: genId(), customerId: cid, equipType, equipMake, notes,
+      id: genId(), customerId: cid, name: autoName, equipType, equipMake, notes,
       status: "new", createdAt: today(),
       services: [], parts: [], labourTotal: 0, partsTotal: 0, total: 0,
       timeInvested: 0, history: [{ date: today(), note: "Job created" }],
@@ -350,6 +358,10 @@ function NewJob({ customers, onSave, onCancel }) {
         </div>
       </Surface>
       <Surface>
+        <Label>Job Name (optional)</Label>
+        <TInput value={jobName} onChange={setJobName} placeholder="e.g. Honda mower tune-up" />
+      </Surface>
+      <Surface>
         <Label>Notes from customer</Label>
         <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3}
           placeholder="What they described…"
@@ -369,7 +381,7 @@ function NewJob({ customers, onSave, onCancel }) {
 
 // ─── JOB DETAIL ───────────────────────────────────────────
 
-function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCustomer, onUpdateInventory, onBack }) {
+function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCustomer, onUpdateInventory, onBack, onMoveToFlip }) {
   const [tab, setTab] = useState("overview");
   const [partName, setPartName] = useState("");
   const [partCost, setPartCost] = useState("");
@@ -460,9 +472,14 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
         </button>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <EditableField value={customer?.name || ""} placeholder="Customer name"
-              onSave={(v) => customer && onUpdateCustomer({ ...customer, name: v })} />
-            <div style={{ marginTop: 6 }}>
+            <EditableField value={job.name || ""} placeholder="Job name"
+              onSave={(v) => onUpdate({ ...job, name: v })} />
+            <div style={{ marginTop: 4 }}>
+              <EditableField value={customer?.name || ""} placeholder="Customer name"
+                fontSize={15} fontWeight={600} color={T.muted}
+                onSave={(v) => customer && onUpdateCustomer({ ...customer, name: v })} />
+            </div>
+            <div style={{ marginTop: 4 }}>
               <EditableField value={job.equipType || ""} placeholder="Equipment type"
                 fontSize={14} fontWeight={400} color={T.muted}
                 onSave={(v) => onUpdate({ ...job, equipType: v })} />
@@ -501,6 +518,21 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
             Cancel
           </button>
         </div>
+      )}
+      {!isTerminal && (
+        <button onClick={() => {
+          if (window.confirm("Convert this job to a flip? The job will be removed and a new flip entry created.")) {
+            onMoveToFlip();
+          }
+        }}
+          style={{
+            background: "none", border: `1.5px solid ${T.border}`,
+            color: "#c084fc", borderRadius: 12, padding: "12px 16px",
+            fontWeight: 600, fontSize: 14, cursor: "pointer",
+            width: "100%", marginBottom: 16, minHeight: 48,
+          }}>
+          🔄 Move to Flip
+        </button>
       )}
       <div style={{ display: "flex", borderBottom: `1.5px solid ${T.border}`, marginBottom: 16 }}>
         {TABS.map(t => (
@@ -1208,7 +1240,10 @@ function Rates({ services, onSave }) {
 // ─── APP ──────────────────────────────────────────────────
 
 export default function App() {
-  const [jobs, setJobs] = useState(() => loadData(JOBS_KEY, []));
+  const [jobs, setJobs] = useState(() => {
+    const loaded = loadData(JOBS_KEY, []);
+    return loaded.map(j => j.name != null ? j : { ...j, name: "" });
+  });
   const [customers, setCustomers] = useState(() => loadData(CUSTOMERS_KEY, []));
   const [services, setServices] = useState(() => loadData(RATES_KEY, DEFAULT_SERVICES));
   const [inventory, setInventory] = useState(() => loadData(INVENTORY_KEY, []));
@@ -1261,6 +1296,31 @@ export default function App() {
     });
   };
 
+  const handleMoveJobToFlip = (jobId) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const cust = customers.find(c => c.id === job.customerId);
+    const flip = {
+      id: genId(),
+      name: job.name || [cust?.name, job.equipType].filter(Boolean).join(" – ") || "Untitled Flip",
+      status: "acquired",
+      buyPrice: 0,
+      partsSpent: job.partsTotal || 0,
+      timeSpent: job.timeInvested || 0,
+      sellPrice: 0,
+      createdAt: today(),
+      soldAt: null,
+      notes: [job.notes, `Converted from job (created ${job.createdAt})`, cust ? `Customer: ${cust.name}` : null].filter(Boolean).join("\n"),
+      history: [...(job.history || []), { date: today(), note: "Converted from repair job to flip" }],
+    };
+    const nextJobs = jobs.filter(j => j.id !== jobId);
+    setJ(nextJobs);
+    const nextFlips = [flip, ...flips];
+    setF(nextFlips);
+    setSelFlipId(flip.id);
+    setScreen("flip");
+  };
+
   const selJob = jobs.find(j => j.id === selJobId);
   const selCust = selJob ? customers.find(c => c.id === selJob.customerId) : null;
   const selFlip = flips.find(f => f.id === selFlipId);
@@ -1307,7 +1367,8 @@ export default function App() {
             inventory={inventory}
             onUpdate={handleUpdateJob} onUpdateCustomer={handleUpdateCustomer}
             onUpdateInventory={setI}
-            onBack={() => setScreen("home")} />
+            onBack={() => setScreen("home")}
+            onMoveToFlip={() => handleMoveJobToFlip(selJobId)} />
         )}
         {screen === "flip" && selFlip && (
           <FlipDetail flip={selFlip} onUpdate={handleUpdateFlip}
