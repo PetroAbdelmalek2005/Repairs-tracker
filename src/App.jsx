@@ -47,6 +47,10 @@ const nextSt = (k) => {
   const i = FLOW_STATUSES.findIndex(s => s.key === k);
   return FLOW_STATUSES[Math.min(i + 1, FLOW_STATUSES.length - 1)].key;
 };
+const prevSt = (k) => {
+  const i = FLOW_STATUSES.findIndex(s => s.key === k);
+  return i > 0 ? FLOW_STATUSES[i - 1].key : null;
+};
 
 const FLIP_STATUSES = [
   { key: "acquired", label: "Acquired",  color: "#60a5fa", bg: "#172554" },
@@ -441,6 +445,13 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
     onUpdate({ ...job, status: ns, history });
   };
 
+  const goBack = () => {
+    const ps = prevSt(job.status);
+    if (!ps) return;
+    const history = [...(job.history || []), { date: today(), note: `← ${getSt(ps).label}` }];
+    onUpdate({ ...job, status: ps, history });
+  };
+
   const cancelJob = () => {
     if (!window.confirm("Cancel this job? This can't be undone.")) return;
     const history = [...(job.history || []), { date: today(), note: "→ Cancelled" }];
@@ -501,13 +512,23 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
       </div>
       {!isTerminal && (
         <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+          {prevSt(job.status) && (
+            <button onClick={goBack}
+              style={{
+                background: T.surface, border: `1.5px solid ${T.border}`,
+                color: T.muted, borderRadius: 12, padding: "14px 12px",
+                fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 52,
+              }}>
+              ← {getSt(prevSt(job.status)).label}
+            </button>
+          )}
           <button onClick={advance}
             style={{
               flex: 1, background: st.bg, border: `1.5px solid ${st.color}55`,
               color: st.color, borderRadius: 12, padding: "14px 16px",
               fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 52,
             }}>
-            Mark as {getSt(nextSt(job.status)).label} →
+            {getSt(nextSt(job.status)).label} →
           </button>
           <button onClick={cancelJob}
             style={{
