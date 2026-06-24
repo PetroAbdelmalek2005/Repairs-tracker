@@ -1139,7 +1139,7 @@ function FlipDetail({ flip, onUpdate, onBack }) {
           {numEditor("Buy Price", editBuy, setEditBuy, buyInput, setBuyInput, "buyPrice", "$")}
           {numEditor("Parts Spent", editParts, setEditParts, partsInput, setPartsInput, "partsSpent", "$")}
           {numEditor("Time Spent", editTime, setEditTime, timeInput, setTimeInput, "timeSpent")}
-          {isSold && numEditor("Sell Price", editSell, setEditSell, sellInput, setSellInput, "sellPrice", "$")}
+          {numEditor("Sell Price", editSell, setEditSell, sellInput, setSellInput, "sellPrice", "$")}
 
           <Surface style={{ borderColor: profit >= 0 ? `${T.green}44` : `${T.red}44` }}>
             <Label>Profit Breakdown</Label>
