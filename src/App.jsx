@@ -64,6 +64,10 @@ const nextFlipSt = (k) => {
   const i = FLIP_STATUSES.findIndex(s => s.key === k);
   return FLIP_STATUSES[Math.min(i + 1, FLIP_STATUSES.length - 1)].key;
 };
+const prevFlipSt = (k) => {
+  const i = FLIP_STATUSES.findIndex(s => s.key === k);
+  return i > 0 ? FLIP_STATUSES[i - 1].key : null;
+};
 
 function loadData(key, fallback) {
   try {
@@ -1104,6 +1108,13 @@ function FlipDetail({ flip, onUpdate, onBack }) {
     onUpdate({ ...flip, status: ns, history });
   };
 
+  const goBack = () => {
+    const ps = prevFlipSt(flip.status);
+    if (!ps) return;
+    const history = [...(flip.history || []), { date: today(), note: `← ${getFlipSt(ps).label}` }];
+    onUpdate({ ...flip, status: ps, soldAt: ps !== "sold" ? null : flip.soldAt, history });
+  };
+
   const addNote = () => {
     if (!noteText.trim()) return;
     const history = [...(flip.history || []), { date: today(), note: noteText.trim() }];
@@ -1162,17 +1173,28 @@ function FlipDetail({ flip, onUpdate, onBack }) {
         </div>
       </div>
 
-      {!isSold && (
-        <button onClick={advance}
-          style={{
-            background: st.bg, border: `1.5px solid ${st.color}55`,
-            color: st.color, borderRadius: 12, padding: "14px 16px",
-            fontWeight: 700, fontSize: 15, cursor: "pointer",
-            marginBottom: 16, width: "100%", minHeight: 52,
-          }}>
-          Mark as {getFlipSt(nextFlipSt(flip.status)).label} →
-        </button>
-      )}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        {prevFlipSt(flip.status) && (
+          <button onClick={goBack}
+            style={{
+              background: T.surface, border: `1.5px solid ${T.border}`,
+              color: T.muted, borderRadius: 12, padding: "14px 12px",
+              fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 52,
+            }}>
+            ← {getFlipSt(prevFlipSt(flip.status)).label}
+          </button>
+        )}
+        {!isSold && (
+          <button onClick={advance}
+            style={{
+              flex: 1, background: st.bg, border: `1.5px solid ${st.color}55`,
+              color: st.color, borderRadius: 12, padding: "14px 16px",
+              fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 52,
+            }}>
+            {getFlipSt(nextFlipSt(flip.status)).label} →
+          </button>
+        )}
+      </div>
 
       <div style={{ display: "flex", borderBottom: `1.5px solid ${T.border}`, marginBottom: 16 }}>
         {TABS.map(t => (
