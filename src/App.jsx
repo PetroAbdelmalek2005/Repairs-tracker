@@ -56,6 +56,7 @@ const prevSt = (k) => {
 const FLIP_STATUSES = [
   { key: "acquired", label: "Acquired",  color: "#60a5fa", bg: "#172554" },
   { key: "fixing",   label: "Fixing",    color: "#fbbf24", bg: "#1c1400" },
+  { key: "fixed",    label: "Fixed",     color: "#34d399", bg: "#022c22" },
   { key: "listed",   label: "Listed",    color: "#c084fc", bg: "#1e1030" },
   { key: "sold",     label: "Sold ✓",    color: "#34d399", bg: "#022c22" },
 ];
@@ -227,7 +228,7 @@ function Dashboard({ jobs, flips, customers, onSelectJob, onSelectFlip, onNewJob
   const [jobFilter, setJobFilter] = useState("active");
   const [flipFilter, setFlipFilter] = useState("active");
   const activeJobKeys = ["new", "diag", "approved", "wip", "ready"];
-  const activeFlipKeys = ["acquired", "fixing", "listed"];
+  const activeFlipKeys = ["acquired", "fixing", "fixed", "listed"];
   const visibleJobs = jobFilter === "active" ? jobs.filter(j => activeJobKeys.includes(j.status))
     : jobFilter === "paid" ? jobs.filter(j => j.status === "paid")
     : jobFilter === "cancelled" ? jobs.filter(j => j.status === "cancelled")
