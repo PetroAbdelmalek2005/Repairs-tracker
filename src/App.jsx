@@ -48,6 +48,7 @@ const nextSt = (k) => {
   return FLOW_STATUSES[Math.min(i + 1, FLOW_STATUSES.length - 1)].key;
 };
 const prevSt = (k) => {
+  if (k === "cancelled") return "new";
   const i = FLOW_STATUSES.findIndex(s => s.key === k);
   return i > 0 ? FLOW_STATUSES[i - 1].key : null;
 };
@@ -510,18 +511,18 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
           <Pill statusKey={job.status} />
         </div>
       </div>
-      {!isTerminal && (
-        <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-          {prevSt(job.status) && (
-            <button onClick={goBack}
-              style={{
-                background: T.surface, border: `1.5px solid ${T.border}`,
-                color: T.muted, borderRadius: 12, padding: "14px 12px",
-                fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 52,
-              }}>
-              ← {getSt(prevSt(job.status)).label}
-            </button>
-          )}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
+        {prevSt(job.status) && (
+          <button onClick={goBack}
+            style={{
+              background: T.surface, border: `1.5px solid ${T.border}`,
+              color: T.muted, borderRadius: 12, padding: "14px 12px",
+              fontWeight: 700, fontSize: 15, cursor: "pointer", minHeight: 52,
+            }}>
+            ← {getSt(prevSt(job.status)).label}
+          </button>
+        )}
+        {!isTerminal && (
           <button onClick={advance}
             style={{
               flex: 1, background: st.bg, border: `1.5px solid ${st.color}55`,
@@ -530,6 +531,8 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
             }}>
             {getSt(nextSt(job.status)).label} →
           </button>
+        )}
+        {!isTerminal && (
           <button onClick={cancelJob}
             style={{
               background: "#1f1315", border: "1.5px solid #f8717155",
@@ -538,8 +541,8 @@ function JobDetail({ job, customer, allServices, inventory, onUpdate, onUpdateCu
             }}>
             Cancel
           </button>
-        </div>
-      )}
+        )}
+      </div>
       {!isTerminal && (
         <button onClick={() => {
           if (window.confirm("Convert this job to a flip? The job will be removed and a new flip entry created.")) {
