@@ -219,15 +219,20 @@ function EditableField({ value, onSave, fontSize = 22, fontWeight = 800, color =
 
 // ─── DASHBOARD ────────────────────────────────────────────
 
-function Dashboard({ jobs, flips, customers, onSelect, onNew }) {
-  const [filter, setFilter] = useState("active");
-  const activeKeys = ["new", "diag", "approved", "wip", "ready"];
-  const visible = filter === "active" ? jobs.filter(j => activeKeys.includes(j.status))
-    : filter === "paid" ? jobs.filter(j => j.status === "paid")
-    : filter === "cancelled" ? jobs.filter(j => j.status === "cancelled")
+function Dashboard({ jobs, flips, customers, onSelectJob, onSelectFlip, onNewJob, onNewFlip }) {
+  const [jobFilter, setJobFilter] = useState("active");
+  const [flipFilter, setFlipFilter] = useState("active");
+  const activeJobKeys = ["new", "diag", "approved", "wip", "ready"];
+  const activeFlipKeys = ["acquired", "fixing", "listed"];
+  const visibleJobs = jobFilter === "active" ? jobs.filter(j => activeJobKeys.includes(j.status))
+    : jobFilter === "paid" ? jobs.filter(j => j.status === "paid")
+    : jobFilter === "cancelled" ? jobs.filter(j => j.status === "cancelled")
     : jobs;
+  const visibleFlips = flipFilter === "active" ? flips.filter(f => activeFlipKeys.includes(f.status))
+    : flipFilter === "sold" ? flips.filter(f => f.status === "sold")
+    : flips;
   const revenue = jobs.filter(j => j.status === "paid").reduce((s, j) => s + (j.total || 0), 0);
-  const open = jobs.filter(j => activeKeys.includes(j.status)).length;
+  const open = jobs.filter(j => activeJobKeys.includes(j.status)).length;
   const totalJobProfit = jobs.filter(j => j.status === "paid").reduce((s, j) => s + jobProfit(j), 0);
   const totalFlipProfit = flips.filter(f => f.status === "sold").reduce((s, f) => s + flipProfit(f), 0);
 
@@ -243,16 +248,25 @@ function Dashboard({ jobs, flips, customers, onSelect, onNew }) {
         <StatCard label="Flip Profit" value={fmt(totalFlipProfit)}
           color={totalFlipProfit >= 0 ? T.green : T.red} />
       </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+        <div style={{ color: T.text, fontWeight: 800, fontSize: 20 }}>💼 Jobs</div>
+        <button onClick={onNewJob}
+          style={{ background: T.accent, color: "#fff", border: "none", borderRadius: 99,
+            padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", minHeight: 36 }}>
+          + New Job
+        </button>
+      </div>
       <FilterTabs options={[["active","Active"],["paid","Paid"],["cancelled","Cancelled"],["all","All"]]}
-        active={filter} onChange={setFilter} />
-      {visible.length === 0
-        ? <div style={{ color: T.dim, textAlign: "center", padding: "60px 0", fontSize: 15 }}>
-            No jobs — tap + to add one
+        active={jobFilter} onChange={setJobFilter} />
+      {visibleJobs.length === 0
+        ? <div style={{ color: T.dim, textAlign: "center", padding: "32px 0", fontSize: 15 }}>
+            No jobs
           </div>
-        : visible.map(job => {
+        : visibleJobs.map(job => {
           const cust = customers.find(c => c.id === job.customerId);
           return (
-            <button key={job.id} onClick={() => onSelect(job.id)}
+            <button key={job.id} onClick={() => onSelectJob(job.id)}
               style={{
                 background: T.surface, border: `1px solid ${T.border}`,
                 borderRadius: 14, padding: 16, cursor: "pointer",
@@ -284,7 +298,49 @@ function Dashboard({ jobs, flips, customers, onSelect, onNew }) {
           );
         })
       }
-      <FAB onClick={onNew} />
+
+      <div style={{ borderTop: `1px solid ${T.border}`, marginTop: 8 }} />
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ color: T.text, fontWeight: 800, fontSize: 20 }}>🔄 Flips</div>
+        <button onClick={onNewFlip}
+          style={{ background: T.accent, color: "#fff", border: "none", borderRadius: 99,
+            padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer", minHeight: 36 }}>
+          + New Flip
+        </button>
+      </div>
+      <FilterTabs options={[["active", "Active"], ["sold", "Sold"], ["all", "All"]]}
+        active={flipFilter} onChange={setFlipFilter} />
+      {visibleFlips.length === 0
+        ? <div style={{ color: T.dim, textAlign: "center", padding: "32px 0", fontSize: 15 }}>
+            No flips
+          </div>
+        : visibleFlips.map(flip => (
+          <button key={flip.id} onClick={() => onSelectFlip(flip.id)}
+            style={{
+              background: T.surface, border: `1px solid ${T.border}`,
+              borderRadius: 14, padding: 16, cursor: "pointer",
+              textAlign: "left", width: "100%", minHeight: 70,
+            }}>
+            <div style={{ display: "flex", justifyContent: "space-between",
+              alignItems: "flex-start", marginBottom: 8 }}>
+              <div style={{ color: T.text, fontWeight: 700, fontSize: 17 }}>{flip.name}</div>
+              <Pill statusKey={flip.status} statuses={FLIP_STATUSES} />
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ color: T.muted, fontSize: 13 }}>
+                Bought: {flip.buyPrice > 0 ? fmt(flip.buyPrice) : "Free"}
+              </div>
+              {flip.status === "sold" && (
+                <div style={{ color: flipProfit(flip) >= 0 ? T.green : T.red,
+                  fontFamily: T.mono, fontWeight: 700, fontSize: 15 }}>
+                  {flipProfit(flip) >= 0 ? "+" : ""}{fmt(flipProfit(flip))}
+                </div>
+              )}
+            </div>
+          </button>
+        ))
+      }
     </div>
   );
 }
@@ -1273,7 +1329,6 @@ export default function App() {
   const [inventory, setInventory] = useState(() => loadData(INVENTORY_KEY, []));
   const [flips, setFlips] = useState(() => loadData(FLIPS_KEY, []));
   const [screen, setScreen] = useState("home");
-  const [navTab, setNavTab] = useState("jobs");
   const [selJobId, setSelJobId] = useState(null);
   const [selFlipId, setSelFlipId] = useState(null);
 
@@ -1350,11 +1405,12 @@ export default function App() {
   const selFlip = flips.find(f => f.id === selFlipId);
 
   const detailScreen = screen === "job" || screen === "flip";
+  const subScreen = screen === "inventory" || screen === "rates";
 
   return (
     <div style={{ background: T.bg, minHeight: "100vh", color: T.text,
       fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-      paddingBottom: detailScreen ? 24 : 90 }}>
+      paddingBottom: detailScreen || subScreen ? 24 : 90 }}>
       <div style={{
         background: T.surface, borderBottom: `1px solid ${T.border}`,
         padding: "16px 18px", display: "flex", justifyContent: "space-between",
@@ -1370,20 +1426,35 @@ export default function App() {
         )}
       </div>
       <div style={{ padding: "18px 16px", maxWidth: 520, margin: "0 auto" }}>
-        {screen === "home" && navTab === "jobs" && (
+        {screen === "home" && (
           <Dashboard jobs={jobs} flips={flips} customers={customers}
-            onSelect={id => { setSelJobId(id); setScreen("job"); }}
-            onNew={() => setScreen("new")} />
+            onSelectJob={id => { setSelJobId(id); setScreen("job"); }}
+            onSelectFlip={id => { setSelFlipId(id); setScreen("flip"); }}
+            onNewJob={() => setScreen("new")}
+            onNewFlip={() => setScreen("newFlip")} />
         )}
-        {screen === "home" && navTab === "inventory" && (
-          <Inventory items={inventory} onSave={setI} />
+        {screen === "inventory" && (
+          <div>
+            <button onClick={() => setScreen("home")}
+              style={{ background: "none", border: "none", color: T.muted,
+                fontSize: 15, cursor: "pointer", padding: "0 0 12px 0",
+                display: "flex", alignItems: "center", gap: 4, minHeight: 44 }}>
+              ← Back
+            </button>
+            <Inventory items={inventory} onSave={setI} />
+          </div>
         )}
-        {screen === "home" && navTab === "flips" && (
-          <FlipsDashboard flips={flips}
-            onSelect={id => { setSelFlipId(id); setScreen("flip"); }}
-            onNew={() => setScreen("newFlip")} />
+        {screen === "rates" && (
+          <div>
+            <button onClick={() => setScreen("home")}
+              style={{ background: "none", border: "none", color: T.muted,
+                fontSize: 15, cursor: "pointer", padding: "0 0 12px 0",
+                display: "flex", alignItems: "center", gap: 4, minHeight: 44 }}>
+              ← Back
+            </button>
+            <Rates services={services} onSave={setS} />
+          </div>
         )}
-        {screen === "home" && navTab === "rates" && <Rates services={services} onSave={setS} />}
         {screen === "new" && <NewJob customers={customers} onSave={handleNewJob} onCancel={() => setScreen("home")} />}
         {screen === "newFlip" && <NewFlip onSave={handleNewFlip} onCancel={() => setScreen("home")} />}
         {screen === "job" && selJob && (
@@ -1405,16 +1476,16 @@ export default function App() {
           background: T.surface, borderTop: `1px solid ${T.border}`,
           display: "flex", paddingBottom: "env(safe-area-inset-bottom, 8px)",
         }}>
-          {[["jobs","Jobs","💼"],["inventory","Inventory","📦"],["flips","Flips","🔄"],["rates","Rates","⚙"]].map(([k,l,icon]) => (
-            <button key={k} onClick={() => setNavTab(k)}
+          {[["inventory","Inventory","📦"],["rates","Rates","⚙"]].map(([k,l,icon]) => (
+            <button key={k} onClick={() => setScreen(k)}
               style={{
                 flex: 1, background: "none", border: "none", cursor: "pointer",
                 display: "flex", flexDirection: "column", alignItems: "center",
                 gap: 3, padding: "12px 0", minHeight: 60,
-                borderTop: `2px solid ${navTab === k ? T.accent : "transparent"}`,
+                borderTop: `2px solid transparent`,
               }}>
               <span style={{ fontSize: 18 }}>{icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, color: navTab === k ? "#60a5fa" : T.dim }}>{l}</span>
+              <span style={{ fontSize: 10, fontWeight: 700, color: T.dim }}>{l}</span>
             </button>
           ))}
         </div>
